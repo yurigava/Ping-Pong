@@ -6,8 +6,9 @@
 
 #define STACKSIZE 32768		/* tamanho de pilha das threads */
 
-int tid_count=0;
-task_t tMain;
+int tid_count=0;	//Contagem de id
+task_t tMain;		//Task da Main
+task_t *tAtual;		//Task atual
 
 void pingpong_init()
 {
@@ -16,6 +17,7 @@ void pingpong_init()
 	t_Main.tid = 0;
 	tid_count++
 	getcontext(&(tMain.tContext));
+	tAtual = tMain;
 }
 
 int task_create (task_t *task, void (*start_routine)(void *),  void *arg)
@@ -39,13 +41,23 @@ int task_create (task_t *task, void (*start_routine)(void *),  void *arg)
 	  exit (1);
 	}
 	makecontext(&(task->tContext), start_routine, 1, arg);
+	tAtual = task;
 	#ifdef DEBUG
 	printf("task_create criou tarefa %d\n", task->tid);
 	#endif
 }
 
+void task_exit (int exitCode)
+{
+	task_switch(&tMain);
+}
+
+int task_switch (task_t *task)
+{
+
+}
 
 int task_id ()
 {
-	return 
+	return tAtual->tid; 
 }
