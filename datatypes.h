@@ -7,6 +7,8 @@
 #ifndef __DATATYPES__
 #define __DATATYPES__
 
+#include <ucontext.h>
+
 // Estrutura que define uma tarefa
 typedef struct task_t
 {
