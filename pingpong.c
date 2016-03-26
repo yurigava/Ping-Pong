@@ -11,7 +11,6 @@ task_t *tAtual;		//Task atual
 task_t *userTasks=NULL;	//Lista de Tasks
 task_t *dispatcher;	//Tarefa do dipatcher
 
-
 void pingpong_init()
 {
 	/* desativa o buffer da saida padrao (stdout), usado pela função printf */
@@ -66,6 +65,7 @@ int task_create (task_t *task, void (*start_routine)(void *),  void *arg)
 	{
 		task->tid = task->prev->tid + 1;
 	}
+	task->prio = 0;
 	makecontext(&(task->tContext), (void*)(*start_routine), 1, arg);
 	#ifdef DEBUG
 	printf("task_create criou tarefa %d\n", task->tid);
@@ -100,13 +100,49 @@ void task_exit (int exitCode)
 	#endif
 }
 
+int task_getprio (task_t *task)
+{
+	#ifdef DEBUG
+	printf("task_getprio retornou a prioridade da tarefa %d", tAtual->tid);
+	#endif
+	if(task != NULL)
+	{
+		return task->prio;
+	}
+	else
+	{
+		return tAtual->prio;
+	}
+}
+
 int task_id ()
 {
+	#ifdef DEBUG
+	printf("task_id retornou o id da tarefa %d", tAtual->tid);
+	#endif
 	return tAtual->tid;
 }
 
 void task_resume (task_t *task)
 {
+}
+
+void task_setprio (task_t *task, int prio)
+{
+	#ifdef DEBUG
+	printf("task_setprio setou a prioridade da tarefa %d", tAtual->tid);
+	#endif
+	if((prio <= 20) && (prio <= -20))
+	{
+		if(task != NULL)
+		{
+			task->prio = prio;
+		}
+		else
+		{
+			tAtual->prio = prio;
+		}
+	}
 }
 
 void task_suspend (task_t *task, task_t **queue)
@@ -136,6 +172,9 @@ int task_switch (task_t *task)
 void task_yield()
 {
 	task_switch(dispatcher);
+	#ifdef DEBUG
+	printf("task_yield suspendeu a execução da tarefa %d", tAtual->tid);
+	#endif
 }
 
 void dispatcher_body() // dispatcher é uma tarefa
