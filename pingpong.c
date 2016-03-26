@@ -6,29 +6,43 @@
 
 #define STACKSIZE 32768		/* tamanho de pilha das threads */
 
-int tid_count=0;	//Contagem de id
 task_t tMain;		//Task da Main
 task_t *tAtual;		//Task atual
+task_t *userTasks=NULL;	//Lista de Tasks
+task_t *dispatcher;	//Tarefa do dipatcher
+
 
 void pingpong_init()
 {
 	/* desativa o buffer da saida padrao (stdout), usado pela função printf */
 	setvbuf (stdout, 0, _IONBF, 0);
 	tMain.tid = 0;
-	tid_count++;
 	getcontext(&(tMain.tContext));
 	tAtual = &tMain;
+	dispatcher=(task_t *) malloc(sizeof(task_t));
+	task_create(dispatcher, dispatcher_body, "");
 	#ifdef DEBUG
 	printf("pingpong_init criou tarefa main (%d)\n", tMain.tid);
 	#endif
+}
+
+task_t * scheduler()
+{
+	if(userTasks != NULL)
+	{
+		userTasks = userTasks->next;
+		return userTasks->prev;
+	}
+	else
+	{
+		return 0;
+	}
 }
 
 int task_create (task_t *task, void (*start_routine)(void *),  void *arg)
 {
 	char *stack;
 
-	task->tid = tid_count;
-	tid_count++;
 	getcontext(&(task->tContext));
 	stack = malloc(STACKSIZE);
 	if (stack)
@@ -42,6 +56,15 @@ int task_create (task_t *task, void (*start_routine)(void *),  void *arg)
 	{
 	  perror ("Erro na criação da pilha");
 	  exit (1);
+	}
+	queue_append((queue_t **) &userTasks, (queue_t *)task);
+	if(userTasks == NULL)
+	{
+		task->tid = 1;
+	}
+	else
+	{
+		task->tid = task->prev->tid + 1;
 	}
 	makecontext(&(task->tContext), (void*)(*start_routine), 1, arg);
 	#ifdef DEBUG
@@ -59,10 +82,35 @@ int task_create (task_t *task, void (*start_routine)(void *),  void *arg)
 
 void task_exit (int exitCode)
 {
-	task_switch(&tMain);
+	task_t *aux;
+	queue_remove((queue_t **) &userTasks, (queue_t *) tAtual);
+	switch(exitCode)
+	{
+		case 0:			//Saída normal
+			aux = dispatcher;
+			break;
+		case 1:			//Saída do Dispatcher
+			free(dispatcher);
+			aux = &tMain;
+			break;
+	}
+	task_switch(aux);
 	#ifdef DEBUG
 	printf("task_exit terminou a tarefa %d\n", tAtual->tid);
 	#endif
+}
+
+int task_id ()
+{
+	return tAtual->tid;
+}
+
+void task_resume (task_t *task)
+{
+}
+
+void task_suspend (task_t *task, task_t **queue)
+{
 }
 
 int task_switch (task_t *task)
@@ -85,7 +133,23 @@ int task_switch (task_t *task)
 	}
 }
 
-int task_id ()
+void task_yield()
 {
-	return tAtual->tid; 
+	task_switch(dispatcher);
+}
+
+void dispatcher_body() // dispatcher é uma tarefa
+{
+	task_t *next;
+	while ( queue_size((queue_t *) userTasks) > 1 )
+	{
+		next = scheduler() ;  // scheduler é uma função
+		if (next)
+		{
+			// ações antes de lançar a tarefa "next", se houverem
+			task_switch (next) ; // transfere controle para a tarefa "next"
+			// ações após retornar da tarefa "next", se houverem
+		}
+	}
+	task_exit(1) ; // encerra a tarefa dispatcher
 }
