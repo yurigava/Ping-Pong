@@ -29,8 +29,22 @@ task_t * scheduler()
 {
 	if(userTasks != NULL)
 	{
-		userTasks = userTasks->next;
-		return userTasks->prev;
+		task_t *menorPrio=userTasks->next;
+		task_t *atual=userTasks->next;
+		do
+		{
+			atual = atual->next;
+			if(menorPrio->prio > atual->prio)
+			{
+				menorPrio->prio--;
+				menorPrio = atual;
+			}
+			else
+			{
+				menorPrio->prio--;
+			}
+		} while(atual != userTasks);
+		return menorPrio;
 	}
 	else
 	{
@@ -132,7 +146,7 @@ void task_setprio (task_t *task, int prio)
 	#ifdef DEBUG
 	printf("task_setprio setou a prioridade da tarefa %d", tAtual->tid);
 	#endif
-	if((prio <= 20) && (prio <= -20))
+	if((prio <= 20) && (prio >= -20))
 	{
 		if(task != NULL)
 		{
