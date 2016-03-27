@@ -5,6 +5,8 @@
 #include "pingpong.h"
 
 #define STACKSIZE 32768		/* tamanho de pilha das threads */
+#define MIN -20				// Prioridade de menor valor (máxima)
+#define MAX 20				// Prioridade de maio valor (mínima)
 
 task_t tMain;		//Task da Main
 task_t *tAtual;		//Task atual
@@ -30,20 +32,28 @@ task_t * scheduler()
 	if(userTasks != NULL)
 	{
 		task_t *menorPrio=userTasks->next;
-		task_t *atual=userTasks->next;
+		task_t *aux=userTasks->next;
+		aux = aux->next;
 		do
 		{
-			atual = atual->next;
-			if(menorPrio->prio > atual->prio)
+			if((menorPrio->dinPrio > aux->dinPrio) && (aux != dispatcher))
 			{
-				menorPrio->prio--;
-				menorPrio = atual;
+				menorPrio = aux;
 			}
-			else
+			aux = aux->next;
+		} while(aux != userTasks);
+		do
+		{
+			aux = aux->next;
+			if((aux != menorPrio) && (aux != dispatcher))
 			{
-				menorPrio->prio--;
+				aux->dinPrio--;
+				if(aux->dinPrio < -20)
+				{
+					aux->dinPrio = MIN;
+				}
 			}
-		} while(atual != userTasks);
+		} while (aux != userTasks);
 		return menorPrio;
 	}
 	else
@@ -79,7 +89,8 @@ int task_create (task_t *task, void (*start_routine)(void *),  void *arg)
 	{
 		task->tid = task->prev->tid + 1;
 	}
-	task->prio = 0;
+	task->statPrio = 0;
+	task->dinPrio = 0;
 	makecontext(&(task->tContext), (void*)(*start_routine), 1, arg);
 	#ifdef DEBUG
 	printf("task_create criou tarefa %d\n", task->tid);
@@ -121,11 +132,11 @@ int task_getprio (task_t *task)
 	#endif
 	if(task != NULL)
 	{
-		return task->prio;
+		return task->statPrio;
 	}
 	else
 	{
-		return tAtual->prio;
+		return tAtual->statPrio;
 	}
 }
 
@@ -143,19 +154,37 @@ void task_resume (task_t *task)
 
 void task_setprio (task_t *task, int prio)
 {
-	#ifdef DEBUG
-	printf("task_setprio setou a prioridade da tarefa %d", tAtual->tid);
-	#endif
-	if((prio <= 20) && (prio >= -20))
+	int tempPrio=0;
+	if(prio <= MAX)
 	{
-		if(task != NULL)
+		if(prio >= MIN)
 		{
-			task->prio = prio;
+			tempPrio = prio;
 		}
 		else
 		{
-			tAtual->prio = prio;
+			tempPrio = MIN;
 		}
+	}
+	else
+	{
+		tempPrio = MAX;
+	}
+	if(task != NULL)
+	{
+		#ifdef DEBUG
+		printf("task_setprio setou a prioridade da tarefa %d", task->tid);
+		#endif
+		task->statPrio = tempPrio;
+		task->dinPrio = tempPrio;
+	}
+	else
+	{
+		#ifdef DEBUG
+		printf("task_setprio setou a prioridade da tarefa %d", tAtual->tid);
+		#endif
+		tAtual->statPrio = tempPrio;
+		tAtual->dinPrio = tempPrio;
 	}
 }
 
