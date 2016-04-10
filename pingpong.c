@@ -2,26 +2,62 @@
 #include <ucontext.h>
 #include <stdlib.h>
 #include <malloc.h>
+#include <signal.h>
+#include <sys/time.h>
 #include "pingpong.h"
 
 #define STACKSIZE 32768		/* tamanho de pilha das threads */
 #define MIN -20				// Prioridade de menor valor (máxima)
 #define MAX 20				// Prioridade de maio valor (mínima)
+#define ticks 20			// Tamanho do quantum padrão
 
-task_t tMain;		//Task da Main
-task_t *tAtual;		//Task atual
-task_t *userTasks=NULL;	//Lista de Tasks
-task_t *dispatcher;	//Tarefa do dipatcher
+task_t tMain;				//Task da Main
+task_t *tAtual;				//Task atual
+task_t *userTasks=NULL;		//Lista de Tasks
+task_t *dispatcher;			//Tarefa do dipatcher
+
+struct sigaction action ;	//Tratador de sinal
+struct itimerval timer;		//Timer
 
 void pingpong_init()
 {
 	/* desativa o buffer da saida padrao (stdout), usado pela função printf */
 	setvbuf (stdout, 0, _IONBF, 0);
+
+	//Seta tarefa principal
 	tMain.tid = 0;
+	tMain.sys_task = true;
 	getcontext(&(tMain.tContext));
 	tAtual = &tMain;
+
+	//Seta tarefa do dispatcher
 	dispatcher=(task_t *) malloc(sizeof(task_t));
+	dispatcher->tid = 1;
+	dispatcher->sys_task = true;
 	task_create(dispatcher, dispatcher_body, "");
+
+	//Seta controlador de ticks
+	action.sa_handler = ticks_body;
+	sigemptyset (&action.sa_mask);
+	action.sa_flags = 0 ;
+	if (sigaction (SIGALRM, &action, 0) < 0)
+	{
+		perror ("Erro em sigaction: ");
+		exit (1) ;
+	}
+
+	// ajusta valores do temporizador
+	timer.it_value.tv_usec = 1000;		// primeiro disparo, em micro-segundos
+	timer.it_value.tv_sec  = 0;			// primeiro disparo, em segundos
+	timer.it_interval.tv_usec = 1000;	// disparos subsequentes, em micro-segundos
+	timer.it_interval.tv_sec  = 0;		// disparos subsequentes, em segundos
+
+	// arma o temporizador ITIMER_REAL
+	if (setitimer (ITIMER_REAL, &timer, 0) < 0)
+	{
+		perror ("Erro em setitimer: ") ;
+		exit (1) ;
+	}
 	#ifdef DEBUG
 	printf("pingpong_init criou tarefa main (%d)\n", tMain.tid);
 	#endif
@@ -54,6 +90,8 @@ task_t * scheduler()
 				}
 			}
 		} while (aux != userTasks);
+		//printf("Prio: %d\n", menorPrio->dinPrio);
+		menorPrio->dinPrio = menorPrio->statPrio;
 		return menorPrio;
 	}
 	else
@@ -81,11 +119,7 @@ int task_create (task_t *task, void (*start_routine)(void *),  void *arg)
 	  exit (1);
 	}
 	queue_append((queue_t **) &userTasks, (queue_t *)task);
-	if(userTasks == NULL)
-	{
-		task->tid = 1;
-	}
-	else
+	if(task->next != task)	// Verifica se é o dispatcher
 	{
 		task->tid = task->prev->tid + 1;
 	}
@@ -234,4 +268,25 @@ void dispatcher_body() // dispatcher é uma tarefa
 		}
 	}
 	task_exit(1) ; // encerra a tarefa dispatcher
+}
+
+void ticks_body(int signum)
+{
+	if(tAtual->sys_task)
+	{
+		return;
+	}
+	if(tAtual->quantum == -1)
+	{
+		tAtual->quantum = ticks;
+	}
+	else if(tAtual->quantum == 0)
+	{
+		tAtual->quantum--;
+		task_yield();
+	}
+	else
+	{
+		tAtual->quantum--;
+	}
 }

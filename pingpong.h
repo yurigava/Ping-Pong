@@ -23,6 +23,9 @@ void dispatcher_body();
 //Função do Scheduler
 task_t * scheduler();
 
+//Tratamento de Ticks
+void ticks_body(int signum);
+
 // gerência de tarefas =========================================================
 
 // Cria uma nova tarefa. Retorna um ID> 0 ou erro.
