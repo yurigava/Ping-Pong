@@ -20,6 +20,8 @@ typedef struct task_t
 	int dinPrio;					// Prioridade Dinâmica
 	bool sys_task;					// Define se a tarefa é uma tarefa do sistema
 	int quantum;					// Define o tamanho do quantum de uma tarefa
+	unsigned int procTime;			// Tempo de processamento
+	unsigned int activations;		// Número de vezes que a tarefa foi ativada
 } task_t ;
 
 // estrutura que define um semáforo

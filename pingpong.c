@@ -19,6 +19,8 @@ task_t *dispatcher;			//Tarefa do dipatcher
 struct sigaction action ;	//Tratador de sinal
 struct itimerval timer;		//Timer
 
+unsigned int totalTicks=0;
+
 void pingpong_init()
 {
 	/* desativa o buffer da saida padrao (stdout), usado pela função printf */
@@ -143,6 +145,8 @@ void task_exit (int exitCode)
 {
 	task_t *aux;
 	queue_remove((queue_t **) &userTasks, (queue_t *) tAtual);
+	printf("Task %d exit: execution time %u ms, processor time %u ms, %u activations\n", tAtual-> tid,
+													systime(), tAtual->procTime, tAtual->activations);
 	switch(exitCode)
 	{
 		case 0:			//Saída normal
@@ -153,10 +157,10 @@ void task_exit (int exitCode)
 			aux = &tMain;
 			break;
 	}
-	task_switch(aux);
 	#ifdef DEBUG
 	printf("task_exit terminou a tarefa %d\n", tAtual->tid);
 	#endif
+	task_switch(aux);
 }
 
 int task_getprio (task_t *task)
@@ -233,6 +237,7 @@ int task_switch (task_t *task)
 	#ifdef DEBUG
 	printf("task_switch mudou %d -> %d\n", tAtual->tid, task->tid);
 	#endif
+	task->activations++;
 	aux = tAtual;
 	tAtual = task;
 	resul = swapcontext(&(aux->tContext), &(task->tContext));
@@ -248,10 +253,15 @@ int task_switch (task_t *task)
 
 void task_yield()
 {
-	task_switch(dispatcher);
 	#ifdef DEBUG
 	printf("task_yield suspendeu a execução da tarefa %d", tAtual->tid);
 	#endif
+	task_switch(dispatcher);
+}
+
+unsigned int systime ()
+{
+	return totalTicks;
 }
 
 void dispatcher_body() // dispatcher é uma tarefa
@@ -272,6 +282,8 @@ void dispatcher_body() // dispatcher é uma tarefa
 
 void ticks_body(int signum)
 {
+	totalTicks++;
+	tAtual->procTime++;
 	if(tAtual->sys_task)
 	{
 		return;
