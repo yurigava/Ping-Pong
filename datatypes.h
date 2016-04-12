@@ -8,13 +8,20 @@
 #define __DATATYPES__
 
 #include <ucontext.h>
+#include <stdbool.h>
 
 // Estrutura que define uma tarefa
 typedef struct task_t
 {
-	struct task_t *prev, *next ;   // para usar com a biblioteca de filas (cast)
-	int tid ;                      // ID da tarefa
-	ucontext_t tContext;		   // Contexto da tarefa
+	struct task_t *prev, *next ;	// para usar com a biblioteca de filas (cast)
+	int tid ;						// ID da tarefa
+	ucontext_t tContext;			// Contexto da tarefa
+	int statPrio;					// Prioridade da tarefa
+	int dinPrio;					// Prioridade Dinâmica
+	bool sys_task;					// Define se a tarefa é uma tarefa do sistema
+	int quantum;					// Define o tamanho do quantum de uma tarefa
+	unsigned int procTime;			// Tempo de processamento
+	unsigned int activations;		// Número de vezes que a tarefa foi ativada
 } task_t ;
 
 // estrutura que define um semáforo

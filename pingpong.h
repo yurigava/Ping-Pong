@@ -10,11 +10,21 @@
 #define _XOPEN_SOURCE 600	// para evitar erros POSIX no MacOS X
 
 #include "datatypes.h"		// estruturas de dados necessárias
+#include "queue.h"
 
 // funções gerais ==============================================================
 
 // Inicializa o sistema operacional; deve ser chamada no inicio do main()
 void pingpong_init () ;
+
+//Função do Dispatcher
+void dispatcher_body();
+
+//Função do Scheduler
+task_t * scheduler();
+
+//Tratamento de Ticks
+void ticks_body(int signum);
 
 // gerência de tarefas =========================================================
 
