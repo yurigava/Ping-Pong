@@ -11,12 +11,12 @@
 #define MAX 20				// Prioridade de maio valor (mínima)
 #define ticks 20			// Tamanho do quantum padrão
 
-task_t tMain;				//Task da Main
+task_t *tMain;				//Task da Main
 task_t *tAtual;				//Task atual
-task_t *userTasks=NULL;		//Lista de Tasks
+task_t *ltProntas=NULL;		//Lista de Tasks
 task_t *dispatcher;			//Tarefa do dipatcher
 
-struct sigaction action ;	//Tratador de sinal
+struct sigaction action;	//Tratador de sinal
 struct itimerval timer;		//Timer
 
 unsigned int totalTicks=0;
@@ -27,16 +27,21 @@ void pingpong_init()
 	setvbuf (stdout, 0, _IONBF, 0);
 
 	//Seta tarefa principal
-	tMain.tid = 0;
-	tMain.sys_task = true;
-	getcontext(&(tMain.tContext));
-	tAtual = &tMain;
+	tMain = (task_t *) malloc(sizeof(task_t));
+	tMain->tid = 0;
+	tMain->statPrio = 0;
+	tMain->dinPrio = 0;
+	tMain->activations = 0;
+	tMain->procTime = 0;
+	tMain->sys_task = false;
+	getcontext(&(tMain->tContext));
+	tAtual = tMain;
+	queue_append((queue_t **) &ltProntas, (queue_t *)tMain);
 
 	//Seta tarefa do dispatcher
 	dispatcher=(task_t *) malloc(sizeof(task_t));
-	dispatcher->tid = 1;
-	dispatcher->sys_task = true;
 	task_create(dispatcher, dispatcher_body, "");
+	dispatcher->sys_task = true;
 
 	//Seta controlador de ticks
 	action.sa_handler = ticks_body;
@@ -61,17 +66,16 @@ void pingpong_init()
 		exit (1) ;
 	}
 	#ifdef DEBUG
-	printf("pingpong_init criou tarefa main (%d)\n", tMain.tid);
+	printf("pingpong_init inicializou o sistema\n");
 	#endif
 }
 
 task_t * scheduler()
 {
-	if(userTasks != NULL)
+	if(ltProntas != NULL)
 	{
-		task_t *menorPrio=userTasks->next;
-		task_t *aux=userTasks->next;
-		aux = aux->next;
+		task_t *menorPrio = ltProntas;
+		task_t *aux = ltProntas->next;
 		do
 		{
 			if((menorPrio->dinPrio > aux->dinPrio) && (aux != dispatcher))
@@ -79,7 +83,7 @@ task_t * scheduler()
 				menorPrio = aux;
 			}
 			aux = aux->next;
-		} while(aux != userTasks);
+		} while(aux != ltProntas);
 		do
 		{
 			aux = aux->next;
@@ -91,8 +95,7 @@ task_t * scheduler()
 					aux->dinPrio = MIN;
 				}
 			}
-		} while (aux != userTasks);
-		//printf("Prio: %d\n", menorPrio->dinPrio);
+		} while (aux != ltProntas);
 		menorPrio->dinPrio = menorPrio->statPrio;
 		return menorPrio;
 	}
@@ -117,16 +120,19 @@ int task_create (task_t *task, void (*start_routine)(void *),  void *arg)
 	}
 	else
 	{
-	  perror ("Erro na criação da pilha");
-	  exit (1);
+		perror ("Erro na criação da pilha");
+		exit (1);
 	}
-	queue_append((queue_t **) &userTasks, (queue_t *)task);
-	if(task->next != task)	// Verifica se é o dispatcher
+	queue_append((queue_t **) &ltProntas, (queue_t *)task);
+	if(task->next != task)	// Verifica se é a main
 	{
 		task->tid = task->prev->tid + 1;
 	}
 	task->statPrio = 0;
 	task->dinPrio = 0;
+	task->activations = 0;
+	task->procTime = 0;
+	task->sys_task = false;
 	makecontext(&(task->tContext), (void*)(*start_routine), 1, arg);
 	#ifdef DEBUG
 	printf("task_create criou tarefa %d\n", task->tid);
@@ -144,8 +150,8 @@ int task_create (task_t *task, void (*start_routine)(void *),  void *arg)
 void task_exit (int exitCode)
 {
 	task_t *aux;
-	queue_remove((queue_t **) &userTasks, (queue_t *) tAtual);
-	printf("Task %d exit: execution time %u ms, processor time %u ms, %u activations\n", tAtual-> tid,
+	queue_remove((queue_t **) &ltProntas, (queue_t *) tAtual);
+	printf("Task %2d exit: execution time %5u ms, processor time %5u ms, %4u activations\n", tAtual-> tid,
 													systime(), tAtual->procTime, tAtual->activations);
 	switch(exitCode)
 	{
@@ -154,7 +160,7 @@ void task_exit (int exitCode)
 			break;
 		case 1:			//Saída do Dispatcher
 			free(dispatcher);
-			aux = &tMain;
+			aux = tMain;
 			break;
 	}
 	#ifdef DEBUG
@@ -267,7 +273,7 @@ unsigned int systime ()
 void dispatcher_body() // dispatcher é uma tarefa
 {
 	task_t *next;
-	while ( queue_size((queue_t *) userTasks) > 1 )
+	while ( queue_size((queue_t *) ltProntas) > 1 )
 	{
 		next = scheduler() ;  // scheduler é uma função
 		if (next)
