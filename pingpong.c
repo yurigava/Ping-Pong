@@ -192,6 +192,10 @@ int task_id ()
 	return tAtual->tid;
 }
 
+int task_join (task_t *task)
+{
+}
+
 void task_resume (task_t *task)
 {
 }

@@ -22,6 +22,7 @@ typedef struct task_t
 	int quantum;					// Define o tamanho do quantum de uma tarefa
 	unsigned int procTime;			// Tempo de processamento
 	unsigned int activations;		// Número de vezes que a tarefa foi ativada
+	struct task_t *joinedTasks;		// Tarefas que estão esperando pelo fim da tarefa atual
 } task_t ;
 
 // estrutura que define um semáforo
